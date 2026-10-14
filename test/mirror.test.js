@@ -98,11 +98,15 @@ test('real Git mirrors branches, pr/* names, annotated tags, force-pushes, delet
   const events = [];
   let staged = 0;
   const relay = { publish: async e => { staged++; events.push(e); }, query: async () => events };
-  await syncServer(relay, target, cache, signed, expected);
+  await syncServer(async () => relay, target, cache, signed, expected);
   assert.equal(staged, 2);
   assert.equal(equalRefs(parseRefs(await git(['ls-remote', target])).refs, expected.refs), true);
   // The same snapshot works again after a lost success response.
-  await syncServer(relay, target, cache, signed, expected);
+  let connections = 0;
+  await syncServer(async () => ++connections === 1 ? {
+    publish: async () => { throw new Error('Relay disconnected'); }, close() {},
+  } : relay, target, cache, signed, expected);
+  assert.equal(connections, 2, 'retry opens a new relay connection');
   await writeFile(path.join(source, 'README'), 'two');
   await git(['commit', '-qam', 'two'], source);
   await git(['branch', '-D', 'feature'], source);

@@ -136,10 +136,13 @@ export async function mirrorRepository(config, repo, signer, dataDir) {
     }
     // Persist candidates before sending. A crash retries exactly the same events.
     await saveJson(cacheFile, signed);
+    // A large upload to the first server can outlive another relay's idle limit.
+    // Open each publishing connection when it is actually needed.
+    relays.forEach(({ relay }) => relay.close());
     const successful = [];
     for (const { relay, server } of relays) {
       try {
-        await syncServer(relay, cloneUrl(server, config.pubkey, id), directory, signed, state);
+        await syncServer(() => new Relay(relay.url).open(), cloneUrl(server, config.pubkey, id), directory, signed, state);
         successful.push(server);
       } catch (error) { errors.push(`${server}: ${error.message}`); }
     }
@@ -149,10 +152,12 @@ export async function mirrorRepository(config, repo, signer, dataDir) {
   } finally { relays.forEach(({ relay }) => relay.close()); }
 }
 
-export async function syncServer(relay, destination, directory, signed, expected) {
+export async function syncServer(connect, destination, directory, signed, expected) {
   let failure;
   for (let attempt = 0; attempt < 3; attempt++) {
+    let relay;
     try {
+      relay = await connect();
       // GRASP-01: stage signed authorization, then supply its exact Git objects.
       for (const event of signed) await relay.publish(event);
       await git(['push', '--porcelain', '--prune', destination,
@@ -162,7 +167,13 @@ export async function syncServer(relay, destination, directory, signed, expected
       const published = await relay.query({ kinds: [30617, 30618], authors: [signed[0].pubkey], '#d': [signed[0].tags[0][1]] });
       if (signed.some(event => !published.some(e => e.id === event.id))) throw new Error('Signed repository events are not yet queryable');
       return;
-    } catch (error) { failure = error; if (attempt < 2) await sleep(2000 * (attempt + 1)); }
+    } catch (error) {
+      failure = error;
+      if (attempt < 2) {
+        console.error(`Retry ${attempt + 1}/2 for ${destination}: ${error.message}`);
+        await sleep(2000 * (attempt + 1));
+      }
+    } finally { relay?.close?.(); }
   }
   throw failure;
 }
