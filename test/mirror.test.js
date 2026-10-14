@@ -104,9 +104,17 @@ test('real Git mirrors branches, pr/* names, annotated tags, force-pushes, delet
   // The same snapshot works again after a lost success response.
   let connections = 0;
   await syncServer(async () => ++connections === 1 ? {
+    query: async () => [],
     publish: async () => { throw new Error('Relay disconnected'); }, close() {},
   } : relay, target, cache, signed, expected);
   assert.equal(connections, 2, 'retry opens a new relay connection');
+  // A server may omit duplicate acknowledgements. Already-queryable events
+  // still authorize the push and must not need to be republished.
+  await syncServer(async () => ({
+    query: async () => events,
+    publish: async () => { assert.fail('Republished an existing event'); },
+  }), target, cache, signed, expected);
+  assert.equal(staged, 2);
   await writeFile(path.join(source, 'README'), 'two');
   await git(['commit', '-qam', 'two'], source);
   await git(['branch', '-D', 'feature'], source);

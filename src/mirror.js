@@ -158,13 +158,19 @@ export async function syncServer(connect, destination, directory, signed, expect
     let relay;
     try {
       relay = await connect();
+      const filter = { kinds: [30617, 30618], authors: [signed[0].pubkey], '#d': [signed[0].tags[0][1]] };
+      const existing = await relay.query(filter);
       // GRASP-01: stage signed authorization, then supply its exact Git objects.
-      for (const event of signed) await relay.publish(event);
+      // Some servers do not acknowledge duplicate announcements. An exact,
+      // verified event already served by this relay needs no publication.
+      for (const event of signed) {
+        if (!existing.some(e => e.id === event.id)) await relay.publish(event);
+      }
       await git(['push', '--porcelain', '--prune', destination,
         '+refs/heads/*:refs/heads/*', '+refs/tags/*:refs/tags/*'], directory);
       const actual = parseRefs(await git(['ls-remote', '--symref', destination], directory));
       if (!equalRefs(actual.refs, expected.refs) || actual.head !== expected.head) throw new Error('Destination refs or HEAD do not match GitHub snapshot');
-      const published = await relay.query({ kinds: [30617, 30618], authors: [signed[0].pubkey], '#d': [signed[0].tags[0][1]] });
+      const published = await relay.query(filter);
       if (signed.some(event => !published.some(e => e.id === event.id))) throw new Error('Signed repository events are not yet queryable');
       return;
     } catch (error) {
