@@ -44,7 +44,7 @@ An NBUNKSEC is a reusable client credential, **not an offline signing key**. The
 
 ## Hosting and scope
 
-Default GRASP servers are `relay.ngit.dev` and `gitnostr.com`. Both receive actual Git objects and signed repository events; this is an independent Git copy, not just a link back to GitHub. Change `servers` in `config.json`, then restart both services to rebuild their announcements and populate the new servers. Remove an old server only after the new one verifies.
+The default GRASP server is `relay.ngit.dev`. It receives actual Git objects and signed repository events; this is an independent Git copy, not just a link back to GitHub. For additional copies, add GRASP hosts to `servers` in `config.json`, then restart the stack to rebuild its announcements and populate the new servers. Every configured host must verify for the report to be successful. Remove an old server only after the new one verifies.
 
 Repository addresses use `nostr://<npub>/<relay-host>/sandwichfarm--<repository>`. An ordinary ngit installation can clone them. Every published address is recorded in `data/report.json`.
 

@@ -26,7 +26,7 @@ async function main() {
     const secret = generateSecretKey(), clientSecret = generateSecretKey();
     const pubkey = getPublicKey(secret);
     const config = validateConfig({ org: values.org, pubkey, clientPubkey: getPublicKey(clientSecret),
-      servers: ['relay.ngit.dev', 'gitnostr.com'], signerRelays: ['ws://signing-relay:8080'] });
+      servers: ['relay.ngit.dev'], signerRelays: ['ws://signing-relay:8080'] });
     await mkdir(values.secrets, { recursive: true, mode: 0o700 });
     await writeFile(path.join(values.secrets, 'signer.json'), JSON.stringify({ secret: hex(secret), clientPubkey: getPublicKey(clientSecret) }) + '\n', { flag: 'wx', mode: 0o600 });
     await writeFile(path.join(values.secrets, 'nbunksec'), encodeSession({ remotePubkey: pubkey, clientSecret, relays: config.signerRelays }) + '\n', { flag: 'wx', mode: 0o600 });
