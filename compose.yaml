@@ -1,0 +1,47 @@
+services:
+  signing-relay:
+    image: github-ngit-mirror:local
+    build: .
+    command: [relay, --config, /config.json]
+    restart: unless-stopped
+    read_only: true
+    cap_drop: [ALL]
+    security_opt: [no-new-privileges:true]
+    volumes:
+      - ./config.json:/config.json:ro
+  signer:
+    image: github-ngit-mirror:local
+    command: [signer, --config, /config.json, --secrets, /run/secrets]
+    restart: unless-stopped
+    depends_on: [signing-relay]
+    read_only: true
+    cap_drop: [ALL]
+    security_opt: [no-new-privileges:true]
+    volumes:
+      - ./config.json:/config.json:ro
+    secrets:
+      - source: signing_key
+        target: signer.json
+  mirror:
+    image: github-ngit-mirror:local
+    entrypoint: [flock, -n, /data/mirror.lock, node, src/cli.js]
+    command: [mirror, --watch, --config, /config.json, --secrets, /run/secrets, --data, /data]
+    restart: unless-stopped
+    depends_on: [signer, signing-relay]
+    read_only: true
+    cap_drop: [ALL]
+    security_opt: [no-new-privileges:true]
+    tmpfs: [/tmp]
+    environment:
+      GH_TOKEN: ${GH_TOKEN:-}
+    volumes:
+      - ./config.json:/config.json:ro
+      - ./data:/data
+    secrets:
+      - source: session
+        target: nbunksec
+secrets:
+  signing_key:
+    file: ./secrets/signer.json
+  session:
+    file: ./secrets/nbunksec

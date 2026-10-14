@@ -1,0 +1,12 @@
+name: Test
+on: [push, pull_request]
+permissions:
+  contents: read
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+      - run: docker build -t github-ngit-mirror:test .
+      - run: docker run --rm --entrypoint node -v "$PWD/test:/app/test:ro" github-ngit-mirror:test --test test/mirror.test.js test/nip46.test.js
