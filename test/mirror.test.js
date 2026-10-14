@@ -1,6 +1,8 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { mkdtemp, rm, writeFile } from 'node:fs/promises';
+import { mkdtemp, rm, writeFile, readFile, stat } from 'node:fs/promises';
+import { execFile } from 'node:child_process';
+import { promisify } from 'node:util';
 import os from 'node:os';
 import path from 'node:path';
 import { generateSecretKey, getPublicKey, verifyEvent } from 'nostr-tools';
@@ -23,6 +25,22 @@ test('NBUNKSEC interoperable TLV round trip and malformed input rejected', () =>
   assert.deepEqual(decodeSession(encoded), session);
   assert.throws(() => decodeSession(encoded.slice(0, -1)));
   assert.throws(() => decodeSession('nsec1invalid'));
+});
+
+test('one-time setup stores private files, exports no secrets, and refuses identity replacement', async t => {
+  const root = await mkdtemp(path.join(os.tmpdir(), 'ngit-setup-test-'));
+  t.after(() => rm(root, { recursive: true, force: true }));
+  const command = [new URL('../src/cli.js', import.meta.url).pathname, 'setup', '--org', 'sandwichfarm'];
+  const { stdout } = await promisify(execFile)(process.execPath, command, { cwd: root });
+  const keyFile = path.join(root, 'secrets', 'signer.json');
+  const sessionFile = path.join(root, 'secrets', 'nbunksec');
+  const saved = await readFile(keyFile, 'utf8');
+  assert.equal(stdout.includes(JSON.parse(saved).secret), false);
+  assert.equal(stdout.includes((await readFile(sessionFile, 'utf8')).trim()), false);
+  assert.equal((await stat(keyFile)).mode & 0o777, 0o600);
+  assert.equal((await stat(sessionFile)).mode & 0o777, 0o600);
+  await assert.rejects(promisify(execFile)(process.execPath, command, { cwd: root }), /Refusing to overwrite/);
+  assert.equal(await readFile(keyFile, 'utf8'), saved);
 });
 
 test('signer allows only bound client, two Git kinds and organization scope', () => {
