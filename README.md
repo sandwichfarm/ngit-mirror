@@ -14,7 +14,7 @@ docker compose logs -f mirror
 
 Compose runs the signer, mirror, and a private signing relay. No inbound ports are exposed. The first pass imports everything. Later passes run 15 minutes after the previous pass finishes. No GitHub write permission, per-repository workflow, or access token is required. For organizations large enough to exceed GitHub's anonymous API quota, set an optional `GH_TOKEN` in `.env`; public repository reads are sufficient.
 
-`data/report.json` records each repository's clone URL, ref count, successful servers, and errors. **`ok: true` means every discovered repository was verified on every configured server.** A report without `finished` is still in progress. Failures do not prevent other repositories from being attempted and are retried next pass.
+`data/report.json` records each repository's clone URL, ref count, successful servers, and errors. **`ok: true` with `scope: "organization"` means every discovered repository was verified on every configured server.** A targeted `--only` run has `scope: "single"` and verifies only that repository. A report without `finished` is still in progress. Failures do not prevent other repositories from being attempted and are retried next pass.
 
 ```sh
 # Stop automatic mirroring; signer remains online.

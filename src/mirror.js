@@ -173,7 +173,7 @@ export async function mirrorAll(config, { dataDir, sessionFile, token, only }) {
   const chosen = only ? repos.filter(r => r.name === only) : repos;
   if (only && !chosen.length) throw new Error(`Public repository not found: ${only}`);
   await saveJson(path.join(dataDir, 'inventory.json'), repos.map(r => ({ id: r.id, name: r.full_name, archived: r.archived, fork: r.fork, sizeKiB: r.size })));
-  const report = { started: new Date().toISOString(), org: config.org, discovered: repos.length, selected: chosen.length, repositories: [] };
+  const report = { started: new Date().toISOString(), org: config.org, scope: only ? 'single' : 'organization', discovered: repos.length, selected: chosen.length, repositories: [] };
   await saveJson(path.join(dataDir, 'report.json'), report);
   const signer = await new RemoteSigner(decodeSession(await readFile(sessionFile, 'utf8'))).open();
   try {
